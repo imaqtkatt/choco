@@ -1,0 +1,19 @@
+package example
+
+fun adder(x, y) = x + y
+
+val aaa = mutable 0
+
+fun increase() =
+  let a = deref aaa in
+  aaa <- a + 1;
+  a
+
+fun doIncrease(mut) =
+  mut <- deref mut + 1
+
+fun batata() = deref (mutable 0)
+
+#fun main() =
+#  let result = adder(1, 2) in
+#  println(result)
