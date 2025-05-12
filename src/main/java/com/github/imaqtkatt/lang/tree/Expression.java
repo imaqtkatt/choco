@@ -120,4 +120,18 @@ public sealed interface Expression {
      */
     record Deref(Expression mutable) implements Expression {
     }
+
+    /**
+     * Boolean branch expression.
+     * <pre>
+     * {@code
+     * if true then 1 else 0
+     * }
+     * </pre>
+     * @param condition
+     * @param then
+     * @param otherwise
+     */
+    record If(Expression condition, Expression then, Expression otherwise) implements Expression {
+    }
 }

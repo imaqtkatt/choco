@@ -24,6 +24,7 @@ public final class InferExpression {
             case Expression.Binary binary -> switch (binary.op()) {
                 case Add, Sub, Mul, Div -> inferArithmetic(environment, binary.op(), binary.left(), binary.right());
                 case Set -> inferSet(environment, binary.left(), binary.right());
+                case LT, GT, LE, GE -> inferCompare(environment, binary.op(), binary.left(), binary.right());
             };
 
             case Expression.Call call -> inferCall(environment, call);
@@ -35,6 +36,8 @@ public final class InferExpression {
             case Expression.Mutable mutable -> inferMutable(environment, mutable);
 
             case Expression.Seq seq -> inferSeq(environment, seq);
+
+            case Expression.If ifExpression -> inferIf(environment, ifExpression);
 
             case Expression.Int(Integer i) -> new TypedExpression.Int(Type.INT, i);
             case Expression.Bool(Boolean b) -> new TypedExpression.Bool(Type.BOOL, b);
@@ -157,5 +160,31 @@ public final class InferExpression {
                 inferredLeft,
                 inferredRight
         );
+    }
+
+    private static TypedExpression inferIf(Environment environment, Expression.If ifExpression) {
+        var inferredCondition = infer(environment, ifExpression.condition());
+        unify(Type.BOOL, inferredCondition.type(), false);
+
+        var inferredThen = infer(environment, ifExpression.then());
+        var inferredOtherwise = infer(environment, ifExpression.otherwise());
+        unify(inferredThen.type(), inferredOtherwise.type(), true);
+
+        return new TypedExpression.If(inferredThen.type(), inferredCondition, inferredThen, inferredOtherwise);
+    }
+
+    private static TypedExpression inferCompare(
+            Environment environment,
+            Operation op,
+            Expression left,
+            Expression right
+    ) {
+        var inferredLeft = infer(environment, left);
+        unify(Type.INT, inferredLeft.type(), false);
+
+        var inferredRight = infer(environment, right);
+        unify(Type.INT, inferredRight.type(), false);
+
+        return new TypedExpression.Binary(Type.BOOL, inferredLeft, op, inferredRight);
     }
 }

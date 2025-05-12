@@ -20,8 +20,10 @@ public final class InferNode {
     }
 
     private static Node inferFunNode(Environment environment, com.github.imaqtkatt.lang.tree.Node.FunDefinition fun) {
-//        Environment newEnvironment = environment.clone();
         var parameters = new ArrayList<Type>();
+
+        var rec = HoleGen.newHole();
+        environment.declare(fun.name(), Scheme.ofType(rec));
 
         HoleGen.enterLevel();
         fun.params().forEach((param) -> {

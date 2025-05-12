@@ -148,8 +148,17 @@ public final class Lexer {
             case '<' -> {
                 if (consume('-')) {
                     yield TokenType.LeftArrow;
+                } else if (consume('=')) {
+                    yield TokenType.LessEqual;
                 } else {
-                    throw new RuntimeException("TODO: logic operators");
+                    yield TokenType.LessThan;
+                }
+            }
+            case '>' -> {
+                if (consume('=')) {
+                    yield TokenType.GreaterEqual;
+                } else {
+                    yield TokenType.GreaterThan;
                 }
             }
             case ',' -> TokenType.Comma;

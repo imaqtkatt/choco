@@ -7,11 +7,12 @@ public enum Precedence {
 
     Set(2),
 
-    Logic(3),
-    Sum(4),
-    Product(5),
+    Compare(3),
+    Logic(4),
+    Sum(5),
+    Product(6),
 
-    End(6);
+    End(7);
 
     final int value;
 
@@ -22,11 +23,12 @@ public enum Precedence {
     public Precedence left() {
         return switch (this) {
             case Start -> Seq;
+            case Seq -> Set;
+            case Set -> Compare;
+            case Compare -> Logic;
             case Logic -> Sum;
             case Sum -> Product;
             case Product -> End;
-            case Seq -> Set;
-            case Set -> Logic;
             case End -> throw new RuntimeException();
         };
     }

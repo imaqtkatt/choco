@@ -6,4 +6,8 @@ public enum Operation {
     Mul,
     Div,
     Set,
+    LT,
+    GT,
+    LE,
+    GE,
 }

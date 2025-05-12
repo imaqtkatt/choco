@@ -44,9 +44,11 @@ public class Main {
         try (var dcl = new DynamicClassLoader(urls, ClassLoader.getSystemClassLoader())) {
             Class<?> clazz = dcl.loadClass("example.Main");
             System.out.println("clazz.getDeclaredMethods() = " + Arrays.toString(clazz.getDeclaredMethods()));
-            Method adder = clazz.getDeclaredMethod("adder", Integer.class, Integer.class);
-            Object result = adder.invoke(null, 1, 2);
-            System.out.println("result = " + result);
+            Method adder = clazz.getDeclaredMethod("increase");
+            Object result1 = adder.invoke(null);
+            System.out.println("result = " + result1);
+            Object result2 = adder.invoke(null);
+            System.out.println("result = " + result2);
         }
     }
 }

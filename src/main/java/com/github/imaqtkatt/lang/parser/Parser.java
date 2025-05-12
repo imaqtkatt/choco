@@ -115,6 +115,7 @@ public final class Parser {
             case Star, Slash -> Precedence.Product;
             case LeftArrow -> Precedence.Set;
             case Semicolon -> Precedence.Seq;
+            case LessThan, GreaterThan, LessEqual, GreaterEqual -> Precedence.Compare;
 
             default -> Precedence.End;
         };
@@ -128,6 +129,10 @@ public final class Parser {
             case Slash -> slash(left);
             case Semicolon -> seq(left);
             case LeftArrow -> set(left);
+            case LessThan -> lt(left);
+            case GreaterThan -> gt(left);
+            case LessEqual -> le(left);
+            case GreaterEqual -> ge(left);
             default -> unexpected();
 //            default -> throw new UnsupportedOperationException();
         };
@@ -168,6 +173,16 @@ public final class Parser {
         return new Expression.Let(name.lexeme(), value, body);
     }
 
+    private Expression ifExpression() {
+        expect(TokenType.If);
+        var condition = expression(Precedence.Start.left());
+        expect(TokenType.Then);
+        var then = expression(Precedence.Start.left());
+        expect(TokenType.Else);
+        var otherwise = expression(Precedence.Start.left());
+        return new Expression.If(condition, then, otherwise);
+    }
+
     private Expression mutable() {
         expect(TokenType.Mutable);
         var e = expression(Precedence.End);
@@ -185,6 +200,7 @@ public final class Parser {
             case Let -> let();
             case Mutable -> mutable();
             case Deref -> deref();
+            case If -> ifExpression();
             default -> call();
         };
     }
@@ -284,5 +300,29 @@ public final class Parser {
         expect(TokenType.LeftArrow);
         var right = expression(Precedence.Set.left());
         return new Expression.Binary(left, Operation.Set, right);
+    }
+
+    private Expression lt(Expression left) {
+        expect(TokenType.LessThan);
+        var right = expression(Precedence.Compare.left());
+        return new Expression.Binary(left, Operation.LT, right);
+    }
+
+    private Expression gt(Expression left) {
+        expect(TokenType.GreaterThan);
+        var right = expression(Precedence.Compare.left());
+        return new Expression.Binary(left, Operation.GT, right);
+    }
+
+    private Expression le(Expression left) {
+        expect(TokenType.LessEqual);
+        var right = expression(Precedence.Compare.left());
+        return new Expression.Binary(left, Operation.LE, right);
+    }
+
+    private Expression ge(Expression left) {
+        expect(TokenType.GreaterEqual);
+        var right = expression(Precedence.Compare.left());
+        return new Expression.Binary(left, Operation.GE, right);
     }
 }

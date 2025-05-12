@@ -14,6 +14,12 @@ fun doIncrease(mut) =
 
 fun batata() = deref (mutable 0)
 
+fun fib(n) =
+  if n <= 1 then
+    n
+  else
+    fib(n - 1) + fib(n - 2)
+
 #fun main() =
 #  let result = adder(1, 2) in
 #  println(result)

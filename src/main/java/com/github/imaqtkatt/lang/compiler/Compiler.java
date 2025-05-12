@@ -32,7 +32,7 @@ public final class Compiler {
     }
 
     public byte[] compile() throws IOException {
-        ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+        ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
 
         writer.visit(
                 Opcodes.V1_8,
@@ -60,7 +60,24 @@ public final class Compiler {
                     false
             );
             methodVisitor.visitInsn(Opcodes.RETURN);
-            methodVisitor.visitMaxs(1, 1);
+            methodVisitor.visitMaxs(0, 0);
+            methodVisitor.visitEnd();
+        }
+        {
+            var methodVisitor = writer.visitMethod(
+                    Opcodes.ACC_STATIC,
+                    "<clinit>",
+                    "()V",
+                    null,
+                    null
+            );
+            for (var node : program.definitions()) {
+                if (node instanceof Node.ValDefinition val) {
+                    compileVal(methodVisitor, val);
+                }
+            }
+            methodVisitor.visitInsn(Opcodes.RETURN);
+            methodVisitor.visitMaxs(0, 0);
             methodVisitor.visitEnd();
         }
         for (var node : program.definitions()) {
@@ -73,6 +90,17 @@ public final class Compiler {
             }
         }
         return writer.toByteArray();
+    }
+
+    private void compileVal(MethodVisitor methodVisitor, Node.ValDefinition val) {
+        Map<String, Integer> emptyMap = Map.of();
+        compileExpression(methodVisitor, emptyMap, val.value());
+        methodVisitor.visitFieldInsn(
+                Opcodes.PUTSTATIC,
+                className,
+                val.name(),
+                val.type().javaDescriptor()
+        );
     }
 
     private void compileFun(ClassWriter writer, Node.FunDefinition fun) {
@@ -103,14 +131,18 @@ public final class Compiler {
 
         compileExpression(methodVisitor, vars, body);
         var retDescriptor = fun.body().type().javaDescriptor();
-        switch (retDescriptor) {
-            case "V" -> {
-                methodVisitor.visitInsn(Opcodes.RETURN);
-            }
-            default -> {
-                methodVisitor.visitInsn(Opcodes.ARETURN);
-            }
+        if (retDescriptor.equals(Type.VOID.javaDescriptor())) {
+            methodVisitor.visitInsn(Opcodes.RETURN);
+        } else {
+            methodVisitor.visitInsn(Opcodes.ARETURN);
         }
+        methodVisitor.visitFrame(
+                Opcodes.F_SAME,
+                0,
+                new Object[]{},
+                0,
+                new Object[]{}
+        );
         methodVisitor.visitMaxs(0, 0);
         methodVisitor.visitEnd();
     }
@@ -142,6 +174,33 @@ public final class Compiler {
                                 MUTABLE_SET_DESCRIPTOR,
                                 false
                         );
+                    }
+                    case LT, GT, LE, GE -> {
+                        compileExpression(methodVisitor, vars, binary.left());
+                        unwrapInteger(methodVisitor);
+                        compileExpression(methodVisitor, vars, binary.right());
+                        unwrapInteger(methodVisitor);
+
+                        var yes = new Label();
+                        var no = new Label();
+                        var end = new Label();
+
+                        switch (binary.op()) {
+                            case LT -> methodVisitor.visitJumpInsn(Opcodes.IF_ICMPLT, yes);
+                            case GT -> methodVisitor.visitJumpInsn(Opcodes.IF_ICMPGT, yes);
+                            case LE -> methodVisitor.visitJumpInsn(Opcodes.IF_ICMPLE, yes);
+                            case GE -> methodVisitor.visitJumpInsn(Opcodes.IF_ICMPGE, yes);
+                        }
+
+                        methodVisitor.visitLabel(no);
+                        methodVisitor.visitInsn(Opcodes.ICONST_0);
+                        methodVisitor.visitJumpInsn(Opcodes.GOTO, end);
+
+                        methodVisitor.visitLabel(yes);
+                        methodVisitor.visitInsn(Opcodes.ICONST_1);
+//                        methodVisitor.visitJumpInsn(Opcodes.GOTO, end);
+
+                        methodVisitor.visitLabel(end);
                     }
                 }
             }
@@ -225,6 +284,26 @@ public final class Compiler {
                     );
                 }
             }
+            case TypedExpression.If ifExpression -> {
+                compileExpression(methodVisitor, vars, ifExpression.condition());
+
+                var thenLabel = new Label();
+                var otherwiseLabel = new Label();
+                var end = new Label();
+
+                // if zero
+                methodVisitor.visitJumpInsn(Opcodes.IFEQ, otherwiseLabel);
+
+                methodVisitor.visitLabel(thenLabel);
+                compileExpression(methodVisitor, vars, ifExpression.then());
+                methodVisitor.visitJumpInsn(Opcodes.GOTO, end);
+
+                methodVisitor.visitLabel(otherwiseLabel);
+                compileExpression(methodVisitor, vars, ifExpression.otherwise());
+                methodVisitor.visitJumpInsn(Opcodes.GOTO, end);
+
+                methodVisitor.visitLabel(end);
+            }
         }
     }
 
@@ -239,22 +318,29 @@ public final class Compiler {
     }
 
     private static void wrapInteger(MethodVisitor methodVisitor) {
+        final String valueOf = "valueOf";
+        final String descriptor = "(I)Ljava/lang/Integer;";
         methodVisitor.visitMethodInsn(
                 Opcodes.INVOKESTATIC,
-                "java/lang/Integer",
-                "valueOf",
-                "(I)Ljava/lang/Integer;",
+                INTEGER_TYPE,
+                valueOf,
+                descriptor,
                 false
         );
     }
 
     private static void unwrapInteger(MethodVisitor methodVisitor) {
-        methodVisitor.visitTypeInsn(Opcodes.CHECKCAST, INTEGER_TYPE);
+        final String intValue = "intValue";
+        final String descriptor = "()I";
+
+        // TODO: check if really needs this
+//         methodVisitor.visitTypeInsn(Opcodes.CHECKCAST, INTEGER_TYPE);
+
         methodVisitor.visitMethodInsn(
                 Opcodes.INVOKEVIRTUAL,
-                "java/lang/Integer",
-                "intValue",
-                "()I",
+                INTEGER_TYPE,
+                intValue,
+                descriptor,
                 false
         );
     }

@@ -34,4 +34,8 @@ public sealed interface TypedExpression {
 
     record Deref(Type type, TypedExpression mutable) implements TypedExpression {
     }
+
+    record If(Type type, TypedExpression condition, TypedExpression then,
+              TypedExpression otherwise) implements TypedExpression {
+    }
 }

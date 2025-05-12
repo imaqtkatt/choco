@@ -15,7 +15,7 @@ public final class Unify {
             case Pair(Type.Fun a_, Type.Fun b_) -> {
                 if (a_.params().size() != b_.params().size()) {
 //                    yield false;
-                    throw new RuntimeException("Arity error");
+                    throw new RuntimeException("Arity error between '%s' and '%s'".formatted(a, b));
                 }
 
                 boolean retVal = unify(a_.ret(), b_.ret(), true);
