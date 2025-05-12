@@ -24,7 +24,8 @@ public final class InferExpression {
             case Expression.Binary binary -> switch (binary.op()) {
                 case Add, Sub, Mul, Div -> inferArithmetic(environment, binary.op(), binary.left(), binary.right());
                 case Set -> inferSet(environment, binary.left(), binary.right());
-                case LT, GT, LE, GE -> inferCompare(environment, binary.op(), binary.left(), binary.right());
+                case LT, GT, LE, GE, Eql -> inferCompare(environment, binary.op(), binary.left(), binary.right());
+                case And, Or -> inferLogical(environment, binary.op(), binary.left(), binary.right());
             };
 
             case Expression.Call call -> inferCall(environment, call);
@@ -184,6 +185,21 @@ public final class InferExpression {
 
         var inferredRight = infer(environment, right);
         unify(Type.INT, inferredRight.type(), false);
+
+        return new TypedExpression.Binary(Type.BOOL, inferredLeft, op, inferredRight);
+    }
+
+    private static TypedExpression inferLogical(
+            Environment environment,
+            Operation op,
+            Expression left,
+            Expression right
+    ) {
+        var inferredLeft = infer(environment, left);
+        unify(Type.BOOL, inferredLeft.type(), false);
+
+        var inferredRight = infer(environment, right);
+        unify(Type.BOOL, inferredRight.type(), false);
 
         return new TypedExpression.Binary(Type.BOOL, inferredLeft, op, inferredRight);
     }

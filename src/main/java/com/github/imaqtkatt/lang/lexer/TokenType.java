@@ -33,6 +33,8 @@ public enum TokenType {
     GreaterThan,
     LessEqual,
     GreaterEqual,
+    And,
+    Or,
     Dot,
     Comma,
     Semicolon,

@@ -138,13 +138,8 @@ public final class Lexer {
 
         char c = next.get();
         var tokenType = switch (c) {
-            case '(' -> {
-                if (consume(')')) {
-                    yield TokenType.Unit;
-                } else {
-                    yield TokenType.LParens;
-                }
-            }
+            case '(' -> consume(')') ? TokenType.Unit : TokenType.LParens;
+
             case '<' -> {
                 if (consume('-')) {
                     yield TokenType.LeftArrow;
@@ -154,13 +149,8 @@ public final class Lexer {
                     yield TokenType.LessThan;
                 }
             }
-            case '>' -> {
-                if (consume('=')) {
-                    yield TokenType.GreaterEqual;
-                } else {
-                    yield TokenType.GreaterThan;
-                }
-            }
+            case '>' -> consume('=') ? TokenType.GreaterEqual : TokenType.GreaterThan;
+
             case ',' -> TokenType.Comma;
             case ';' -> TokenType.Semicolon;
             case ')' -> TokenType.RParens;
@@ -168,7 +158,8 @@ public final class Lexer {
             case '-' -> TokenType.Minus;
             case '*' -> TokenType.Star;
             case '/' -> TokenType.Slash;
-            case '=' -> TokenType.Equal;
+            case '=' -> consume('=') ? TokenType.EqualEqual : TokenType.Equal;
+
             case '!' -> TokenType.Exclamation;
             case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' -> {
                 this.skipWhile(Character::isDigit);
@@ -198,6 +189,8 @@ public final class Lexer {
                         case "mutable" -> TokenType.Mutable;
                         case "deref" -> TokenType.Deref;
                         case "val" -> TokenType.Val;
+                        case "and" -> TokenType.And;
+                        case "or" -> TokenType.Or;
                         default -> TokenType.LowerIdent;
                     };
                 } else {

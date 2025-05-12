@@ -115,7 +115,9 @@ public final class Parser {
             case Star, Slash -> Precedence.Product;
             case LeftArrow -> Precedence.Set;
             case Semicolon -> Precedence.Seq;
-            case LessThan, GreaterThan, LessEqual, GreaterEqual -> Precedence.Compare;
+            case LessThan, GreaterThan, LessEqual, GreaterEqual, EqualEqual -> Precedence.Compare;
+            case And -> Precedence.And;
+            case Or -> Precedence.Or;
 
             default -> Precedence.End;
         };
@@ -133,6 +135,9 @@ public final class Parser {
             case GreaterThan -> gt(left);
             case LessEqual -> le(left);
             case GreaterEqual -> ge(left);
+            case And -> and(left);
+            case Or -> or(left);
+            case EqualEqual -> eql(left);
             default -> unexpected();
 //            default -> throw new UnsupportedOperationException();
         };
@@ -324,5 +329,23 @@ public final class Parser {
         expect(TokenType.GreaterEqual);
         var right = expression(Precedence.Compare.left());
         return new Expression.Binary(left, Operation.GE, right);
+    }
+
+    private Expression and(Expression left) {
+        expect(TokenType.And);
+        var right = expression(Precedence.And.left());
+        return new Expression.Binary(left, Operation.And, right);
+    }
+
+    private Expression or(Expression left) {
+        expect(TokenType.Or);
+        var right = expression(Precedence.Or.left());
+        return new Expression.Binary(left, Operation.Or, right);
+    }
+
+    private Expression eql(Expression left) {
+        expect(TokenType.EqualEqual);
+        var right = expression(Precedence.Compare.left());
+        return new Expression.Binary(left, Operation.Eql, right);
     }
 }

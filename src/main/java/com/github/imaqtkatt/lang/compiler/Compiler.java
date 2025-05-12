@@ -1,7 +1,5 @@
 package com.github.imaqtkatt.lang.compiler;
 
-import com.github.imaqtkatt.lang.tree.Expression;
-import com.github.imaqtkatt.lang.tree.Operation;
 import com.github.imaqtkatt.lang.typed.Type;
 import com.github.imaqtkatt.lang.typed.tree.Node;
 import com.github.imaqtkatt.lang.typed.tree.Program;
@@ -10,16 +8,16 @@ import org.objectweb.asm.*;
 
 import java.io.IOException;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
+
+import static com.github.imaqtkatt.lang.compiler.BooleanHelpers.unwrapBoolean;
+import static com.github.imaqtkatt.lang.compiler.BooleanHelpers.wrapBoolean;
+import static com.github.imaqtkatt.lang.compiler.IntegerHelpers.unwrapInteger;
+import static com.github.imaqtkatt.lang.compiler.IntegerHelpers.wrapInteger;
 
 public final class Compiler {
     private final Program program;
     private final String className;
-
-    static final String JAVA_LANG_OBJECT = "Ljava/lang/Object;";
-    static final String JAVA_LANG_INTEGER = "Ljava/lang/Integer;";
-    static final String INTEGER_TYPE = "java/lang/Integer";
 
     static final String MUTABLE = "com/github/imaqtkatt/lang/Mutable";
     static final String MUTABLE_SET_DESCRIPTOR = "(Lcom/github/imaqtkatt/lang/Mutable;Ljava/lang/Object;)V";
@@ -43,58 +41,68 @@ public final class Compiler {
                 null
         );
         writer.visitSource(className + ".java", null);
-        {
-            var methodVisitor = writer.visitMethod(
-                    Opcodes.ACC_PUBLIC,
-                    "<init>",
-                    "()V",
-                    null,
-                    null
-            );
-            methodVisitor.visitVarInsn(Opcodes.ALOAD, 0);
-            methodVisitor.visitMethodInsn(
-                    Opcodes.INVOKESPECIAL,
-                    "java/lang/Object",
-                    "<init>",
-                    "()V",
-                    false
-            );
-            methodVisitor.visitInsn(Opcodes.RETURN);
-            methodVisitor.visitMaxs(0, 0);
-            methodVisitor.visitEnd();
-        }
-        {
-            var methodVisitor = writer.visitMethod(
-                    Opcodes.ACC_STATIC,
-                    "<clinit>",
-                    "()V",
-                    null,
-                    null
-            );
-            for (var node : program.definitions()) {
-                if (node instanceof Node.ValDefinition val) {
-                    compileVal(methodVisitor, val);
-                }
-            }
-            methodVisitor.visitInsn(Opcodes.RETURN);
-            methodVisitor.visitMaxs(0, 0);
-            methodVisitor.visitEnd();
-        }
+
+        compileDefaultConstructor(writer);
+
+        compileVals(writer);
+
+        compileProgram(writer);
+
+        return writer.toByteArray();
+    }
+
+    private void compileProgram(ClassWriter writer) {
         for (var node : program.definitions()) {
             if (node instanceof Node.FunDefinition fun) {
                 compileFun(writer, fun);
             }
-            // TODO: compile this in a static context and resolve variables access
-            if (node instanceof com.github.imaqtkatt.lang.typed.tree.Node.ValDefinition val) {
+            if (node instanceof Node.ValDefinition val) {
                 compileVal2(writer, val);
             }
         }
-        return writer.toByteArray();
+    }
+
+    private void compileVals(ClassWriter writer) {
+        var methodVisitor = writer.visitMethod(
+                Opcodes.ACC_STATIC,
+                "<clinit>",
+                "()V",
+                null,
+                null
+        );
+        for (var node : program.definitions()) {
+            if (node instanceof Node.ValDefinition val) {
+                compileVal(methodVisitor, val);
+            }
+        }
+        methodVisitor.visitInsn(Opcodes.RETURN);
+        methodVisitor.visitMaxs(0, 0);
+        methodVisitor.visitEnd();
+    }
+
+    private static void compileDefaultConstructor(ClassWriter writer) {
+        var methodVisitor = writer.visitMethod(
+                Opcodes.ACC_PUBLIC,
+                "<init>",
+                "()V",
+                null,
+                null
+        );
+        methodVisitor.visitVarInsn(Opcodes.ALOAD, 0);
+        methodVisitor.visitMethodInsn(
+                Opcodes.INVOKESPECIAL,
+                "java/lang/Object",
+                "<init>",
+                "()V",
+                false
+        );
+        methodVisitor.visitInsn(Opcodes.RETURN);
+        methodVisitor.visitMaxs(0, 0);
+        methodVisitor.visitEnd();
     }
 
     private void compileVal(MethodVisitor methodVisitor, Node.ValDefinition val) {
-        Map<String, Integer> emptyMap = Map.of();
-        compileExpression(methodVisitor, emptyMap, val.value());
+        compileExpression(methodVisitor, Map.of(), val.value());
         methodVisitor.visitFieldInsn(
                 Opcodes.PUTSTATIC,
                 className,
@@ -117,7 +125,7 @@ public final class Compiler {
         for (int i = 0; i < fun.params().size(); i++) {
             var param = fun.params().get(i);
             var paramType = fun.paramsTypes().get(i);
-            vars.computeIfAbsent(param, (s) -> vars.size());
+            vars.computeIfAbsent(param, (_) -> vars.size());
             var label = new Label();
             methodVisitor.visitLocalVariable(
                     param,
@@ -151,65 +159,15 @@ public final class Compiler {
         switch (e) {
             case TypedExpression.Binary binary -> {
                 switch (binary.op()) {
-                    case Add, Sub, Mul, Div -> {
-                        compileExpression(methodVisitor, vars, binary.left());
-                        unwrapInteger(methodVisitor);
-                        compileExpression(methodVisitor, vars, binary.right());
-                        unwrapInteger(methodVisitor);
-                        switch (binary.op()) {
-                            case Add -> methodVisitor.visitInsn(Opcodes.IADD);
-                            case Sub -> methodVisitor.visitInsn(Opcodes.ISUB);
-                            case Mul -> methodVisitor.visitInsn(Opcodes.IMUL);
-                            case Div -> methodVisitor.visitInsn(Opcodes.IDIV);
-                        }
-                        wrapInteger(methodVisitor);
-                    }
-                    case Set -> {
-                        compileExpression(methodVisitor, vars, binary.left());
-                        compileExpression(methodVisitor, vars, binary.right());
-                        methodVisitor.visitMethodInsn(
-                                Opcodes.INVOKESTATIC,
-                                MUTABLE,
-                                "set",
-                                MUTABLE_SET_DESCRIPTOR,
-                                false
-                        );
-                    }
-                    case LT, GT, LE, GE -> {
-                        compileExpression(methodVisitor, vars, binary.left());
-                        unwrapInteger(methodVisitor);
-                        compileExpression(methodVisitor, vars, binary.right());
-                        unwrapInteger(methodVisitor);
-
-                        var yes = new Label();
-                        var no = new Label();
-                        var end = new Label();
-
-                        switch (binary.op()) {
-                            case LT -> methodVisitor.visitJumpInsn(Opcodes.IF_ICMPLT, yes);
-                            case GT -> methodVisitor.visitJumpInsn(Opcodes.IF_ICMPGT, yes);
-                            case LE -> methodVisitor.visitJumpInsn(Opcodes.IF_ICMPLE, yes);
-                            case GE -> methodVisitor.visitJumpInsn(Opcodes.IF_ICMPGE, yes);
-                        }
-
-                        methodVisitor.visitLabel(no);
-                        methodVisitor.visitInsn(Opcodes.ICONST_0);
-                        methodVisitor.visitJumpInsn(Opcodes.GOTO, end);
-
-                        methodVisitor.visitLabel(yes);
-                        methodVisitor.visitInsn(Opcodes.ICONST_1);
-//                        methodVisitor.visitJumpInsn(Opcodes.GOTO, end);
-
-                        methodVisitor.visitLabel(end);
-                    }
+                    case Add, Sub, Mul, Div -> compileArithmetic(methodVisitor, vars, binary);
+                    case Set -> compileSet(methodVisitor, vars, binary);
+                    case LT, GT, LE, GE, Eql -> compileComparison(methodVisitor, vars, binary);
+                    case And, Or -> compileLogical(methodVisitor, vars, binary);
                 }
             }
             case TypedExpression.Bool(Type ignored, Boolean b) -> {
-                if (b) {
-                    methodVisitor.visitInsn(Opcodes.ICONST_1);
-                } else {
-                    methodVisitor.visitInsn(Opcodes.ICONST_0);
-                }
+                methodVisitor.visitInsn(b ? Opcodes.ICONST_1 : Opcodes.ICONST_0);
+                wrapBoolean(methodVisitor);
             }
             case TypedExpression.Call call -> {
                 for (var arg : call.arguments()) {
@@ -242,7 +200,7 @@ public final class Compiler {
                 wrapInteger(methodVisitor);
             }
             case TypedExpression.Let let -> {
-                vars.computeIfAbsent(let.bind(), (s) -> vars.size());
+                vars.computeIfAbsent(let.bind(), (_) -> vars.size());
                 var label = new Label();
                 var value = let.value();
                 methodVisitor.visitLocalVariable(
@@ -286,6 +244,7 @@ public final class Compiler {
             }
             case TypedExpression.If ifExpression -> {
                 compileExpression(methodVisitor, vars, ifExpression.condition());
+                unwrapBoolean(methodVisitor);
 
                 var thenLabel = new Label();
                 var otherwiseLabel = new Label();
@@ -317,31 +276,93 @@ public final class Compiler {
         );
     }
 
-    private static void wrapInteger(MethodVisitor methodVisitor) {
-        final String valueOf = "valueOf";
-        final String descriptor = "(I)Ljava/lang/Integer;";
+    private void compileArithmetic(MethodVisitor methodVisitor, Map<String, Integer> vars, TypedExpression.Binary binary) {
+        compileExpression(methodVisitor, vars, binary.left());
+        unwrapInteger(methodVisitor);
+        compileExpression(methodVisitor, vars, binary.right());
+        unwrapInteger(methodVisitor);
+        switch (binary.op()) {
+            case Add -> methodVisitor.visitInsn(Opcodes.IADD);
+            case Sub -> methodVisitor.visitInsn(Opcodes.ISUB);
+            case Mul -> methodVisitor.visitInsn(Opcodes.IMUL);
+            case Div -> methodVisitor.visitInsn(Opcodes.IDIV);
+            default -> throw new IllegalStateException();
+        }
+        wrapInteger(methodVisitor);
+    }
+
+    private void compileSet(MethodVisitor methodVisitor, Map<String, Integer> vars, TypedExpression.Binary binary) {
+        compileExpression(methodVisitor, vars, binary.left());
+        compileExpression(methodVisitor, vars, binary.right());
         methodVisitor.visitMethodInsn(
                 Opcodes.INVOKESTATIC,
-                INTEGER_TYPE,
-                valueOf,
-                descriptor,
+                MUTABLE,
+                "set",
+                MUTABLE_SET_DESCRIPTOR,
                 false
         );
     }
 
-    private static void unwrapInteger(MethodVisitor methodVisitor) {
-        final String intValue = "intValue";
-        final String descriptor = "()I";
+    private void compileComparison(MethodVisitor methodVisitor, Map<String, Integer> vars, TypedExpression.Binary binary) {
+        compileExpression(methodVisitor, vars, binary.left());
+        unwrapInteger(methodVisitor);
 
-        // TODO: check if really needs this
-//         methodVisitor.visitTypeInsn(Opcodes.CHECKCAST, INTEGER_TYPE);
+        compileExpression(methodVisitor, vars, binary.right());
+        unwrapInteger(methodVisitor);
 
-        methodVisitor.visitMethodInsn(
-                Opcodes.INVOKEVIRTUAL,
-                INTEGER_TYPE,
-                intValue,
-                descriptor,
-                false
-        );
+        var yes = new Label();
+        var no = new Label();
+        var end = new Label();
+
+        switch (binary.op()) {
+            case LT -> methodVisitor.visitJumpInsn(Opcodes.IF_ICMPLT, yes);
+            case GT -> methodVisitor.visitJumpInsn(Opcodes.IF_ICMPGT, yes);
+            case LE -> methodVisitor.visitJumpInsn(Opcodes.IF_ICMPLE, yes);
+            case GE -> methodVisitor.visitJumpInsn(Opcodes.IF_ICMPGE, yes);
+            case Eql -> methodVisitor.visitJumpInsn(Opcodes.IF_ICMPEQ, yes);
+            default -> throw new IllegalStateException();
+        }
+
+        methodVisitor.visitLabel(no);
+        methodVisitor.visitInsn(Opcodes.ICONST_0);
+        methodVisitor.visitJumpInsn(Opcodes.GOTO, end);
+
+        methodVisitor.visitLabel(yes);
+        methodVisitor.visitInsn(Opcodes.ICONST_1);
+//                        methodVisitor.visitJumpInsn(Opcodes.GOTO, end);
+
+        methodVisitor.visitLabel(end);
+        wrapBoolean(methodVisitor);
+    }
+
+    /**
+     * Compile logical `and` and `or` operations with short circuit evaluation.
+     */
+    private void compileLogical(MethodVisitor methodVisitor, Map<String, Integer> vars, TypedExpression.Binary binary) {
+        compileExpression(methodVisitor, vars, binary.left());
+        unwrapBoolean(methodVisitor);
+
+        var returnFalse = new Label();
+        var returnTrue = new Label();
+        var wrapBoolean = new Label();
+
+        switch (binary.op()) {
+            case And -> methodVisitor.visitJumpInsn(Opcodes.IFEQ, returnFalse);
+            case Or -> methodVisitor.visitJumpInsn(Opcodes.IFNE, returnTrue);
+            default -> throw new IllegalStateException();
+        }
+
+        compileExpression(methodVisitor, vars, binary.right());
+        unwrapBoolean(methodVisitor);
+        methodVisitor.visitJumpInsn(Opcodes.IFEQ, returnFalse);
+
+        methodVisitor.visitLabel(returnTrue);
+        methodVisitor.visitInsn(Opcodes.ICONST_1);
+        methodVisitor.visitJumpInsn(Opcodes.GOTO, wrapBoolean);
+
+        methodVisitor.visitLabel(returnFalse);
+        methodVisitor.visitInsn(Opcodes.ICONST_0);
+        methodVisitor.visitLabel(wrapBoolean);
+        wrapBoolean(methodVisitor);
     }
 }

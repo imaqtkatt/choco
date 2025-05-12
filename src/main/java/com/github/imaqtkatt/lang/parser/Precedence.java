@@ -7,12 +7,15 @@ public enum Precedence {
 
     Set(2),
 
-    Compare(3),
-    Logic(4),
-    Sum(5),
-    Product(6),
+    Or(3),
+    And(4),
 
-    End(7);
+    Compare(5),
+    Logic(6),
+    Sum(7),
+    Product(8),
+
+    End(9);
 
     final int value;
 
@@ -24,7 +27,9 @@ public enum Precedence {
         return switch (this) {
             case Start -> Seq;
             case Seq -> Set;
-            case Set -> Compare;
+            case Set -> Or;
+            case Or -> And;
+            case And -> Compare;
             case Compare -> Logic;
             case Logic -> Sum;
             case Sum -> Product;

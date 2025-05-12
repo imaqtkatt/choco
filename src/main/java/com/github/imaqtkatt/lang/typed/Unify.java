@@ -28,9 +28,8 @@ public final class Unify {
                 yield retVal;
             }
 
-            case Pair(Type.Bool(), Type.Bool()) -> true;
-            case Pair(Type.Int(), Type.Int()) -> true;
-            case Pair(Type.TString(), Type.TString()) -> true;
+            case Pair(Type.Bool(), Type.Bool()), Pair(Type.Int(), Type.Int()), Pair(Type.TString(), Type.TString()) ->
+                    true;
             case Pair(Type.TVoid(), Type.TVoid()) -> unifyVoid;
 
             default -> {
@@ -63,10 +62,7 @@ public final class Unify {
 
             case Type.Mutable(Type inner) -> occurs(hole, inner);
 
-            case Type.Bool() -> false;
-            case Type.Int() -> false;
-            case Type.TString() -> false;
-            case Type.TVoid() -> false;
+            case Type.Bool(), Type.Int(), Type.TString(), Type.TVoid() -> false;
         };
     }
 

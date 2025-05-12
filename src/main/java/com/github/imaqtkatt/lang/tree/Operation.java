@@ -10,4 +10,7 @@ public enum Operation {
     GT,
     LE,
     GE,
+    Eql,
+    And,
+    Or,
 }
