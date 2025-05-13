@@ -1,5 +1,6 @@
 package com.github.imaqtkatt.lang.compiler;
 
+import com.github.imaqtkatt.lang.parser.Scope;
 import com.github.imaqtkatt.lang.typed.Type;
 import com.github.imaqtkatt.lang.typed.tree.Node;
 import com.github.imaqtkatt.lang.typed.tree.Program;
@@ -19,10 +20,10 @@ public final class Compiler {
     private final Program program;
     private final String className;
 
-    static final String MUTABLE = "com/github/imaqtkatt/lang/Mutable";
-    static final String MUTABLE_SET_DESCRIPTOR = "(Lcom/github/imaqtkatt/lang/Mutable;Ljava/lang/Object;)V";
-    static final String MUTABLE_DEREF_DESCRIPTOR = "(Lcom/github/imaqtkatt/lang/Mutable;)Ljava/lang/Object;";
-    static final String MUTABLE_OF_DESCRIPTOR = "(Ljava/lang/Object;)Lcom/github/imaqtkatt/lang/Mutable;";
+    static final String MUTABLE = "choco/lang/Mutable";
+    static final String MUTABLE_SET_DESCRIPTOR = "(Lchoco/lang/Mutable;Ljava/lang/Object;)V";
+    static final String MUTABLE_DEREF_DESCRIPTOR = "(Lchoco/lang/Mutable;)Ljava/lang/Object;";
+    static final String MUTABLE_OF_DESCRIPTOR = "(Ljava/lang/Object;)Lchoco/lang/Mutable;";
 
     public Compiler(com.github.imaqtkatt.lang.typed.tree.Program program) {
         this.program = program;
@@ -116,8 +117,8 @@ public final class Compiler {
         var methodVisitor = writer.visitMethod(
                 Opcodes.ACC_STATIC | Opcodes.ACC_PUBLIC,
                 fun.name(),
-                descriptor,
-                fun.type().signature(),
+                !fun.name().equals("lambda") ? descriptor : "()Lchoco/lang/Function;",
+                !fun.name().equals("lambda") ? fun.type().signature() : null,
                 null
         );
         var body = fun.body();
@@ -173,7 +174,9 @@ public final class Compiler {
                 for (var arg : call.arguments()) {
                     compileExpression(methodVisitor, vars, arg);
                 }
-                if (call.callee() instanceof TypedExpression.Variable(Type type, String name)) {
+                if (call.callee() instanceof TypedExpression.Variable(
+                        Type type, String name, Scope.DeclarationType decType
+                ) && decType == Scope.DeclarationType.Fun) {
                     methodVisitor.visitMethodInsn(
                             Opcodes.INVOKESTATIC,
                             className,
@@ -181,6 +184,8 @@ public final class Compiler {
                             type.javaDescriptor(),
                             false
                     );
+                } else {
+                    throw new IllegalStateException();
                 }
             }
             case TypedExpression.Deref(Type type, TypedExpression mutable) -> {
@@ -230,16 +235,20 @@ public final class Compiler {
                 compileExpression(methodVisitor, vars, seq.right());
             }
             case TypedExpression.Variable variable -> {
-                Integer index;
-                if ((index = vars.get(variable.name())) != null) {
-                    methodVisitor.visitVarInsn(Opcodes.ALOAD, index);
-                } else {
-                    methodVisitor.visitFieldInsn(
+                switch (variable.decType()) {
+                    case Val -> methodVisitor.visitFieldInsn(
                             Opcodes.GETSTATIC,
                             className,
                             variable.name(),
                             variable.type().javaDescriptor()
                     );
+
+                    case Fun -> throw new UnsupportedOperationException("Can't use function as reference.");
+
+                    case Var -> {
+                        var index = vars.get(variable.name());
+                        methodVisitor.visitVarInsn(Opcodes.ALOAD, index);
+                    }
                 }
             }
             case TypedExpression.If ifExpression -> {
@@ -263,6 +272,7 @@ public final class Compiler {
 
                 methodVisitor.visitLabel(end);
             }
+            case TypedExpression.Lambda _ -> throw new UnsupportedOperationException("Can't compile lambda");
         }
     }
 

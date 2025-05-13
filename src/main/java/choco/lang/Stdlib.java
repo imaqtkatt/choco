@@ -1,6 +1,6 @@
-package com.github.imaqtkatt.lang;
+package choco.lang;
 
-public final class Prelude {
+public final class Stdlib {
     public static void println(Object o) {
         System.out.println(o);
     }

@@ -51,17 +51,17 @@ public sealed interface Type {
     record Mutable(Type inner) implements Type {
         @Override
         public String javaDescriptor() {
-            return "Lcom/github/imaqtkatt/lang/Mutable;";
+            return "Lchoco/lang/Mutable;";
         }
 
         @Override
         public String javaType() {
-            return "com/github/imaqtkatt/lang/Mutable";
+            return "choco/lang/Mutable";
         }
 
         @Override
         public String signature() {
-            return "Lcom/github/imaqtkatt/lang/Mutable<%s>;".formatted(inner.signature());
+            return "Lchoco/lang/Mutable<%s>;".formatted(inner.signature());
         }
     }
 

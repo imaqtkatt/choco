@@ -138,7 +138,10 @@ public final class Lexer {
 
         char c = next.get();
         var tokenType = switch (c) {
+            case '{' -> TokenType.LBrace;
+            case '}' -> TokenType.RBrace;
             case '(' -> consume(')') ? TokenType.Unit : TokenType.LParens;
+            case ')' -> TokenType.RParens;
 
             case '<' -> {
                 if (consume('-')) {
@@ -153,9 +156,9 @@ public final class Lexer {
 
             case ',' -> TokenType.Comma;
             case ';' -> TokenType.Semicolon;
-            case ')' -> TokenType.RParens;
+            
             case '+' -> TokenType.Plus;
-            case '-' -> TokenType.Minus;
+            case '-' -> consume('>') ? TokenType.Arrow : TokenType.Minus;
             case '*' -> TokenType.Star;
             case '/' -> TokenType.Slash;
             case '=' -> consume('=') ? TokenType.EqualEqual : TokenType.Equal;

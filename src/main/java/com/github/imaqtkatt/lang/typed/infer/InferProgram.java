@@ -8,11 +8,9 @@ public final class InferProgram {
         Environment environment = new Environment();
         var definitions = program.definitions()
                 .stream()
-                .map((definition) -> {
-                    var result = InferNode.infer(environment, definition);
-                    System.out.printf("%s |- %s%n", result, result.type());
-                    return result;
-                })
+                .map((definition) ->
+                        InferNode.infer(environment, definition)
+                )
                 .toList();
         return new Program(program.packageName(), definitions);
     }

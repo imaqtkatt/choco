@@ -14,6 +14,7 @@ import java.util.List;
 public final class Parser {
     private final Lexer lexer;
     private Token current;
+    private final Scope scope = new Scope();
 
     public Parser(Lexer lexer) {
         this.lexer = lexer;
@@ -59,21 +60,16 @@ public final class Parser {
 
     private Expression primary() {
         return switch (peek()) {
-//            case Let -> null;
-//            case Fun -> null;
-//            case Package -> null;
-//            case Import -> null;
-            case UpperIdent -> null;
+            case UpperIdent, Number, Unit -> throw new UnsupportedOperationException();
             case LowerIdent -> {
-                var token = expect(TokenType.LowerIdent);
-                yield new Expression.Variable(token.lexeme());
+                var name = expect(TokenType.LowerIdent).lexeme();
+                var decType = scope.fetch(name);
+                yield new Expression.Variable(name, decType);
             }
             case Integer -> {
                 var token = expect(TokenType.Integer);
                 yield new Expression.Int(Integer.parseInt(token.lexeme()));
             }
-            case Number -> null;
-            case Unit -> null;
             case LParens -> {
                 expect(TokenType.LParens);
                 var expression = expression(Precedence.Start.left());
@@ -89,23 +85,6 @@ public final class Parser {
                 yield new Expression.Bool(false);
             }
             default -> unexpected();
-//                System.out.println("peek() = " + peek());
-//                throw new UnsupportedOperationException();
-
-//            case RParens -> null;
-//            case LBrace -> null;
-//            case RBrace -> null;
-//            case Plus -> null;
-//            case Minus -> null;
-//            case Star -> null;
-//            case Slash -> null;
-//            case Equal -> null;
-//            case EqualEqual -> null;
-//            case Dot -> null;
-//            case Comma -> null;
-//            case Semicolon -> null;
-//            case Error -> null;
-//            case EOF -> null;
         };
     }
 
@@ -139,7 +118,6 @@ public final class Parser {
             case Or -> or(left);
             case EqualEqual -> eql(left);
             default -> unexpected();
-//            default -> throw new UnsupportedOperationException();
         };
     }
 
@@ -169,12 +147,19 @@ public final class Parser {
     }
 
     private Expression let() {
+        scope.enterDynamicScope();
+
         expect(TokenType.Let);
         var name = expect(TokenType.LowerIdent);
+        scope.declare(name.lexeme(), Scope.DeclarationType.Var);
+
         expect(TokenType.Equal);
         var value = expression(Precedence.Start.left());
         expect(TokenType.In);
         var body = expression(Precedence.Start);
+
+        scope.leaveScope();
+
         return new Expression.Let(name.lexeme(), value, body);
     }
 
@@ -206,6 +191,7 @@ public final class Parser {
             case Mutable -> mutable();
             case Deref -> deref();
             case If -> ifExpression();
+            case Arrow -> lambda();
             default -> call();
         };
     }
@@ -237,22 +223,31 @@ public final class Parser {
         expect(TokenType.Fun);
         var name = expect(TokenType.LowerIdent);
 
-        var parameters = new ArrayList<String>();
+        scope.declare(name.lexeme(), Scope.DeclarationType.Fun);
 
-        if (!consume(TokenType.Unit)) {
-            expect(TokenType.LParens);
-            while (!is(TokenType.RParens)) {
-                var param = expect(TokenType.LowerIdent);
-                parameters.add(param.lexeme());
-                if (!consume(TokenType.Comma)) {
-                    break;
+        var parameters = new ArrayList<String>();
+        Expression body;
+
+        {
+            scope.enterDynamicScope();
+            if (!consume(TokenType.Unit)) {
+                expect(TokenType.LParens);
+                while (!is(TokenType.RParens)) {
+                    var param = expect(TokenType.LowerIdent);
+                    parameters.add(param.lexeme());
+                    scope.declare(param.lexeme(), Scope.DeclarationType.Var);
+                    if (!consume(TokenType.Comma)) {
+                        break;
+                    }
                 }
+                expect(TokenType.RParens);
             }
-            expect(TokenType.RParens);
+
+            expect(TokenType.Equal);
+            body = expression(Precedence.Start);
+            scope.leaveScope();
         }
 
-        expect(TokenType.Equal);
-        var body = expression(Precedence.Start);
         return new Node.FunDefinition(name.lexeme(), parameters, body);
     }
 
@@ -261,10 +256,15 @@ public final class Parser {
         var name = expect(TokenType.LowerIdent);
         expect(TokenType.Equal);
         var e = expression(Precedence.Start);
+
+        scope.declare(name.lexeme(), Scope.DeclarationType.Val);
+
         return new Node.ValDefinition(name.lexeme(), e);
     }
 
     public Program program() {
+        scope.enterRestrictScope();
+
         expect(TokenType.Package);
         var packageName = expect(TokenType.LowerIdent);
 
@@ -273,6 +273,8 @@ public final class Parser {
         while (!is(TokenType.EOF)) {
             definitions.add(node());
         }
+
+        scope.leaveScope();
 
         return new Program(packageName.lexeme(), definitions);
     }
@@ -347,5 +349,31 @@ public final class Parser {
         expect(TokenType.EqualEqual);
         var right = expression(Precedence.Compare.left());
         return new Expression.Binary(left, Operation.Eql, right);
+    }
+
+    private Expression lambda() {
+        expect(TokenType.Arrow);
+        var params = new ArrayList<String>();
+        Expression body;
+        {
+            scope.enterDynamicScope();
+            if (!consume(TokenType.Unit)) {
+                expect(TokenType.LParens);
+                while (!is(TokenType.RParens)) {
+                    var param = expect(TokenType.LowerIdent);
+                    params.add(param.lexeme());
+                    scope.declare(param.lexeme(), Scope.DeclarationType.Var);
+                    if (!consume(TokenType.Comma)) {
+                        break;
+                    }
+                }
+                expect(TokenType.RParens);
+            }
+            expect(TokenType.LBrace);
+            body = expression(Precedence.Start.left());
+            expect(TokenType.RBrace);
+            scope.leaveScope();
+        }
+        return new Expression.Lambda(params, body);
     }
 }

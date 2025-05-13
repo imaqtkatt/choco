@@ -1,9 +1,11 @@
 package com.github.imaqtkatt.lang.tree;
 
+import com.github.imaqtkatt.lang.parser.Scope;
+
 import java.util.List;
 
 public sealed interface Expression {
-    record Variable(String name) implements Expression {
+    record Variable(String name, Scope.DeclarationType decType) implements Expression {
     }
 
     /**
@@ -133,5 +135,18 @@ public sealed interface Expression {
      * @param otherwise
      */
     record If(Expression condition, Expression then, Expression otherwise) implements Expression {
+    }
+
+    /**
+     * An anonymous function.
+     * <pre>
+     * {@code
+     * ->(x, y) { x + y }
+     * }
+     * </pre>
+     * @param parameters
+     * @param body
+     */
+    record Lambda(List<String> parameters, Expression body) implements Expression {
     }
 }

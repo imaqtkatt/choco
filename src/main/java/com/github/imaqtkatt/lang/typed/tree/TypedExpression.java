@@ -1,5 +1,6 @@
 package com.github.imaqtkatt.lang.typed.tree;
 
+import com.github.imaqtkatt.lang.parser.Scope;
 import com.github.imaqtkatt.lang.tree.Operation;
 import com.github.imaqtkatt.lang.typed.Type;
 
@@ -8,7 +9,7 @@ import java.util.List;
 public sealed interface TypedExpression {
     Type type();
 
-    record Variable(Type type, String name) implements TypedExpression {
+    record Variable(Type type, String name, Scope.DeclarationType decType) implements TypedExpression {
     }
 
     record Int(Type type, Integer i) implements TypedExpression {
@@ -37,5 +38,8 @@ public sealed interface TypedExpression {
 
     record If(Type type, TypedExpression condition, TypedExpression then,
               TypedExpression otherwise) implements TypedExpression {
+    }
+
+    record Lambda(Type type, List<String> parameters, TypedExpression body) implements TypedExpression {
     }
 }

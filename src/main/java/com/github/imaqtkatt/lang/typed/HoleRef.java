@@ -1,12 +1,12 @@
 package com.github.imaqtkatt.lang.typed;
 
-import com.github.imaqtkatt.lang.Mutable;
+import choco.lang.Mutable;
 
 public final class HoleRef {
     final Mutable<Hole> inner;
 
     public HoleRef(Hole hole) {
-        inner = new Mutable<>(hole);
+        inner = Mutable.of(hole);
     }
 
     public Hole get() {

@@ -40,6 +40,7 @@ public enum TokenType {
     Semicolon,
     Exclamation,
     LeftArrow,
+    Arrow,
     Error,
     EOF,
 }

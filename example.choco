@@ -4,6 +4,8 @@ fun adder(x, y) = x + y
 
 val aaa = mutable 0
 
+val der = deref aaa
+
 fun increase() =
   let a = deref aaa in
   aaa <- a + 1;
@@ -28,7 +30,7 @@ fun isZeroOrOne(n) =
   else
     false
 
-fun between(a) = a < 4 or a > 1
+#fun lambda() = (->(x) { x })(1)
 
 #fun main() =
 #  let result = adder(1, 2) in
